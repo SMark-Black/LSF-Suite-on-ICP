@@ -1,0 +1,274 @@
+###############################################################################
+# Licensed Materials - Property of IBM.
+# Copyright IBM Corporation 2017. All Rights Reserved.
+# U.S. Government Users Restricted Rights - Use, duplication or disclosure
+# restricted by GSA ADP Schedule Contract with IBM Corp.
+#
+# Contributors:
+#  IBM Corporation - initial API and implementation
+###############################################################################
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ .Release.Name }}-pvc"
+  labels:
+    app: "{{ .Release.Name }}" 
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: "{{ template "fullname" . }}"
+  labels:
+    # This makes it easy to search for all components of a release using kubectl
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+    # This makes it easy to audit chart usage.
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: "{{ template "name" . }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: 
+      app: "{{ .Release.Name }}"
+  template:
+    metadata:
+      name: "{{ .Release.Name }}"
+      labels: 
+        app: "{{ .Release.Name }}"
+        release: {{.Release.Name | quote }}
+    spec:
+      containers:
+      - name: "{{ .Release.Name }}-master"
+        image: "{{.Values.lsf.image.repository}}:{{.Values.lsf.image.tag}}"
+        imagePullPolicy: "{{.Values.lsf.image.pullPolicy}}"
+        resources:
+        {{- if .Values.master.enableResourceConstraints }}
+{{ toYaml .Values.master.resources | indent 10 }}
+        {{- else }}
+          {}
+        {{- end }}
+        securityContext:
+          privileged: false
+        args: ["master", "{{ .Values.mariadb.password }}"]
+        volumeMounts:
+        - mountPath: /home
+          name: persistdir
+        {{- if .Values.LDAP.enableLDAP }}
+        - mountPath: "/etc/sssd"
+          name: sssdpvc
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - mountPath: "{{ .Values.Storage.dataMntPnt }}"
+          name: datadir
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - mountPath: "{{ .Values.Storage.appMntPnt }}"
+          name: appdir
+        {{- end }}
+      - name: mariadb
+        image: "{{.Values.mariadb.image.repository}}:{{.Values.mariadb.image.tag}}"
+        imagePullPolicy: "{{.Values.lsf.image.pullPolicy}}"
+        resources:
+        {{- if .Values.mariadb.enableResourceConstraints }}
+{{ toYaml .Values.mariadb.resources | indent 10 }}
+        {{- else }}
+          {}
+        {{- end }}
+        securityContext:
+          privileged: false
+        args: ["--datadir", "/home/lsfadmin/mariadb"]
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "{{ .Values.mariadb.password }}"
+        volumeMounts:
+        - mountPath: /home
+          name: persistdir
+      volumes:
+        - name: persistdir
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-pvc"
+        {{- if .Values.LDAP.enableLDAP }}
+        - name: sssdpvc
+          persistentVolumeClaim:
+            claimName: "{{ .Values.LDAP.sssdPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - name: datadir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.DataPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - name: appdir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.AppPVC }}"
+        {{- end }}
+      imagePullSecrets:
+        - name: admin.registrykey
+      restartPolicy: Always
+      hostname: "{{ .Release.Name }}"
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        deploy_lsf: "true"
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-slave"
+  labels:
+    # This makes it easy to search for all components of a release using kubectl.
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+    # This makes it easy to audit chart usage.
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: "{{ .Release.Name }}-slave"
+spec:
+  replicas: {{ .Values.lsf.worker.replicas }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-slave"
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-slave"
+      labels:
+        app: "{{ .Release.Name }}-slave"
+        release: {{.Release.Name | quote }}
+    spec:
+      containers:
+      - name: "{{ .Release.Name }}-slave"
+        image: "{{.Values.lsf.image.repository}}:{{.Values.lsf.image.tag}}"
+        imagePullPolicy: "{{.Values.lsf.image.pullPolicy}}"
+        resources:
+          limits:
+            cpu: {{ .Values.lsf.worker.cpu }}
+            memory: {{ .Values.lsf.worker.memory }}
+        securityContext:
+          privileged: false
+        args: ["slave", "-", "{{ .Release.Name }}"]
+        volumeMounts:
+        - mountPath: /home
+          name: persistdir
+        {{- if .Values.LDAP.enableLDAP }}
+        - mountPath: "/etc/sssd"
+          name: sssdpvc
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - mountPath: "{{ .Values.Storage.dataMntPnt }}"
+          name: datadir
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - mountPath: "{{ .Values.Storage.appMntPnt }}"
+          name: appdir
+        {{- end }}
+      volumes:
+        - name: persistdir
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-pvc"
+        {{- if .Values.LDAP.enableLDAP }}
+        - name: sssdpvc
+          persistentVolumeClaim:
+            claimName: "{{ .Values.LDAP.sssdPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - name: datadir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.DataPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - name: appdir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.AppPVC }}"
+        {{- end }}
+      imagePullSecrets:
+        - name: admin.registrykey
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        deploy_lsf: "true"
+
+# Scrondary Masters
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-backup"
+  labels:
+    # This makes it easy to search for all components of a release using kubectl.
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+    # This makes it easy to audit chart usage.
+    chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: "{{ .Release.Name }}-backup"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-backup"
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-backup"
+      labels:
+        app: "{{ .Release.Name }}-backup"
+        release: {{.Release.Name | quote }}
+    spec:
+      containers:
+      - name: "{{ .Release.Name }}-backup"
+        image: "{{.Values.lsf.image.repository}}:{{.Values.lsf.image.tag}}"
+        imagePullPolicy: "{{.Values.lsf.image.pullPolicy}}"
+        resources:
+          limits:
+            cpu: {{ .Values.lsf.worker.cpu }}
+            memory: {{ .Values.lsf.worker.memory }}
+        securityContext:
+          privileged: false
+        args: ["backup", "-", "{{ .Release.Name }}"]
+        volumeMounts:
+        - mountPath: /home
+          name: persistdir
+        {{- if .Values.LDAP.enableLDAP }}
+        - mountPath: "/etc/sssd"
+          name: sssdpvc
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - mountPath: "{{ .Values.Storage.dataMntPnt }}"
+          name: datadir
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - mountPath: "{{ .Values.Storage.appMntPnt }}"
+          name: appdir
+        {{- end }}
+      volumes:
+        - name: persistdir
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-pvc"
+        {{- if .Values.LDAP.enableLDAP }}
+        - name: sssdpvc
+          persistentVolumeClaim:
+            claimName: "{{ .Values.LDAP.sssdPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectDataPVC }}
+        - name: datadir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.DataPVC }}"
+        {{- end }}
+        {{- if .Values.Storage.connectAppPVC }}
+        - name: appdir
+          persistentVolumeClaim:
+            claimName: "{{ .Values.Storage.AppPVC }}"
+        {{- end }}
+      imagePullSecrets:
+        - name: admin.registrykey
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        deploy_lsf: "true"
+

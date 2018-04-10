@@ -1,0 +1,12 @@
+[Unit]
+Description=IBM Spectrum LSF
+After=network.target nfs.service autofs.service gpfs.service
+
+[Service]
+Type=forking
+ExecStart=/opt/ibm/lsfsuite/lsf/10.1/linux2.6-glibc2.3-x86_64/etc/lsf_daemons start
+ExecStop=/opt/ibm/lsfsuite/lsf/10.1/linux2.6-glibc2.3-x86_64/etc/lsf_daemons stop
+
+[Install]
+WantedBy=multi-user.target
+

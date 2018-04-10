@@ -1,0 +1,15 @@
+[Unit]
+Description=Filebeat for Spectrum LSF
+Documentation=https://www.elastic.co/guide/en/beats/filebeat/current/index.html
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+EnvironmentFile=-/opt/ibm/elastic/filebeat/config/filebeat.env
+User=root
+Group=root
+ExecStart=/opt/ibm/elastic/filebeat/filebeat -c /opt/ibm/elastic/filebeat/config/filebeat.yml -path.home /opt/ibm/elastic/filebeat -path.config /opt/ibm/elastic/filebeat/config -path.data /opt/ibm/elastic/filebeat/work -path.logs /opt/ibm/elastic/filebeat/log
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

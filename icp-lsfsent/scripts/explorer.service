@@ -1,0 +1,12 @@
+[Unit]
+Description=IBM Spectrum LSF Explorer
+After=network.target nfs.service autofs.service gpfs.service
+
+[Service]
+Type=forking
+ExecStart=/opt/ibm/lsfsuite/ext/explorer/server/admin start
+ExecStop=/opt/ibm/lsfsuite/ext/explorer/server/admin stop
+
+[Install]
+WantedBy=multi-user.target
+

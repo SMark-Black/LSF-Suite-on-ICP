@@ -1,0 +1,40 @@
+[Unit]
+Description=Logstash
+Documentation=http://www.elastic.co
+Wants=elasticsearch-for-lsf.service
+After=elasticsearch-for-lsf.service
+
+[Service]
+Environment=CONF_DIR=/opt/ibm/elastic/logstash/config
+Environment=LOG_DIR=/opt/ibm/elastic/logstash/log
+EnvironmentFile=-/opt/ibm/elastic/logstash/config/logstash.env
+
+WorkingDirectory=/
+
+User=lsfadmin
+Group=root
+
+ExecStart=/opt/ibm/elastic/logstash/bin/logstash "--path.settings" "${CONF_DIR}" "--path.logs" "${LOG_DIR}"
+
+Restart=always
+
+StandardOutput=journal
+StandardError=inherit
+
+Nice=19
+LimitNOFILE=16384
+
+# Disable timeout logic and wait until process is stopped
+TimeoutStopSec=25
+
+# SIGTERM signal is used to stop the Java process
+KillSignal=SIGTERM
+
+# Send the signal only to the JVM rather than its control group
+KillMode=process
+
+# When a JVM receives a SIGTERM signal it exits with code 143
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,65 @@
+###############################################################################
+# Licensed Materials - Property of IBM.
+# Copyright IBM Corporation 2017. All Rights Reserved.
+# U.S. Government Users Restricted Rights - Use, duplication or disclosure
+# restricted by GSA ADP Schedule Contract with IBM Corp.
+#
+# Contributors:
+#  IBM Corporation - initial API and implementation
+###############################################################################
+
+# Default values for lsf master.
+# This is a YAML-formatted file.
+# Declare name/value pairs to be passed into your templates.
+# name: value
+
+lsf:
+  worker: 
+    replicas: 1
+    cpu: "2000m"
+    memory: "2000Mi"
+  image:
+    repository: "lsfsent"
+    tag: "10.2-x86_64"
+    pullPolicy: "IfNotPresent"
+
+Storage:
+  pvc: "lsf"
+  # Allow the connection of optional PVCs
+  connectDataPVC: false
+  DataPVC: "mydatapvc"
+  dataMntPnt: "/data"
+  connectAppPVC: false
+  AppPVC: "myapppvc"
+  appMntPnt: "/apps"
+
+LDAP:
+  # These are optional LDAP parameters
+  enableLDAP: false
+  sssdPVC: "sssdpvc"
+
+master:
+  enableResourceConstraints: false
+  # This parameter enables a secondary LSF master to be deployed
+  enableSecondaryMaster: false
+  resources:
+    requests:
+      cpu: 6000m
+      memory: 8192Mi
+    limits:
+      cpu: 6000m
+      memory: 8192Mi
+
+mariadb:
+  enableResourceConstraints: false
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  password: passw0rd
+  image:
+    repository: ibmcom/mariadb 
+    tag: 10.1.16

@@ -1,0 +1,76 @@
+#--------------------------------------------------------
+# Copyright IBM Corp. 1992, 2017. All rights reserved.
+# US Government Users Restricted Rights - Use, duplication or disclosure
+# restricted by GSA ADP Schedule Contract with IBM Corp.
+#--------------------------------------------------------
+# IBM Spectrum LSF Suite for Enterprise 10.2
+#
+# VERSION 0.1
+#
+# NOTE:  This is built from CentOS 7, which has not been
+#        cleared for external distribution.  This must not
+#        be used out side of IBM.
+#        To use RHEL instead change the line below to the 
+#        distribution of your choice
+FROM centos:centos7
+
+MAINTAINER Mark Black <mblack1@ca.ibm.com>
+
+# Set the source repository to get packages from
+# Copt the "LSF-Suite-10.2-install-on-host87f2.tgz" file
+# to this web server.
+ENV HTTP_SRV=http://10.10.10.1
+
+# Set the name of the tar file that contains the 
+# LSF Suite files.
+ENV TARFILE=LSF-Suite-10.2-install-on-host87f2.tgz
+
+ENV LSFDWNLOAD=${HTTP_SRV}/${TARFILE}
+
+# Add the startup scripts for LSF Suite.  Only needed if 
+# you want to try starting with systemd.
+ADD scripts/acd.service /etc/systemd/system/
+ADD scripts/elasticsearch-for-lsf.service /etc/systemd/system/
+ADD scripts/explorer.service /etc/systemd/system/
+ADD scripts/filebeat-for-lsf.service /etc/systemd/system/
+ADD scripts/logstash-for-lsf.service /etc/systemd/system/
+ADD scripts/lsfd.service /etc/systemd/system/
+ADD scripts/metricbeat-for-lsf.service /etc/systemd/system/
+
+# This the the startup script for LSF Suite without using systemd
+ADD start_lsfsent.sh /root
+
+# Install prerequisites
+RUN yum -y install openssh-server wget gettext net-tools which sssd sysstat mysql-connector-java \
+# create lsfadmin user and set password to lsfadmin
+    && useradd -s /bin/bash -c "LSF Administrator" -m lsfadmin \
+    && echo "lsfadmin:lsfadmin" | chpasswd \
+    && useradd -s /bin/bash -c "LSF User" -m lsfuser \
+    && echo "lsfuser:lsfuser" | chpasswd \
+#    && groupadd -g 999 mariadb \
+#    && useradd -r -u 999 -g 999 -c "MariaDB User" mariadb \
+    && cd /root \
+    && echo "Getting Package: ${LSFDWNLOAD}" \
+    && wget ${LSFDWNLOAD} -o /root/wget.log \
+    && rm -rf /root/wget.log \
+    && cd /opt \
+    && echo "Extracting package" \
+    && tar zxf /root/${TARFILE} \
+    && rm -rf /root/${TARFILE} \
+    && echo "Done extracting package" \
+# Setup profile for LSF
+    && echo "if [ -e /opt/ibm/lsfsuite/lsf/conf/profile.lsf ]; then" > /etc/profile.d/lsf.sh \
+    && echo "    . /opt/ibm/lsfsuite/lsf/conf/profile.lsf" >> /etc/profile.d/lsf.sh \
+    && echo "fi" >> /etc/profile.d/lsf.sh \
+    && cp /root/start_lsfsent.sh / \
+    && chmod 755 /start_lsfsent.sh \
+    && echo "Basic Image ready" \
+    && echo "Now you need to customize it to suite your environment" \
+    && echo "Some things to add are User authentication, Hostname" \
+    && echo "resolution, and any other OS customizations needed." \
+    && echo "File access can be handled using the hostpath option."
+
+#
+EXPOSE 80 7869/udp 7869 6878 6080 6881 6882 22 8080 8443
+
+ENTRYPOINT ["/start_lsfsent.sh"]

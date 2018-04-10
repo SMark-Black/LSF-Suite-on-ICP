@@ -1,0 +1,12 @@
+[Unit]
+Description=IBM Spectrum LSF Application Center
+After=network.target nfs.service autofs.service gpfs.service
+
+[Service]
+Type=forking
+ExecStart=/opt/ibm/lsfsuite/ext/gui/3.0/bin/ac_daemons start
+ExecStop=/opt/ibm/lsfsuite/ext/gui/3.0/bin/ac_daemons stop
+
+[Install]
+WantedBy=multi-user.target
+
